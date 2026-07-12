@@ -3,6 +3,7 @@ package com.example.FoodWaste.controller;
 import com.example.FoodWaste.entity.FoodListing;
 import com.example.FoodWaste.service.FoodListingService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -51,10 +52,12 @@ public class FoodListingController {
 
     // Delete Listing
     @DeleteMapping("/{id}")
-    public String deleteListing(@PathVariable Long id) {
+    public ResponseEntity <String> deleteListing(
+            @PathVariable Long id) {
 
         foodListingService.deleteListing(id);
 
-        return "Food Listing Deleted Successfully";
+        return ResponseEntity.ok(
+                "Food Listing Deleted Successfully");
     }
 }

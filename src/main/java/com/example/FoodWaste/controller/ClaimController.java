@@ -1,5 +1,6 @@
 package com.example.FoodWaste.controller;
 
+import com.example.FoodWaste.dto.ClaimResponse;
 import com.example.FoodWaste.entity.Claim;
 import com.example.FoodWaste.service.ClaimService;
 import lombok.RequiredArgsConstructor;
@@ -55,7 +56,12 @@ public class ClaimController {
 
         return claimService.markPickedUp(id);
     }
+    @GetMapping("/details")
+    public List<ClaimResponse> getAllClaimDetails() {
 
+        return claimService.getAllClaimDetails();
+
+    }
     // Mark Delivered
     @PutMapping("/{id}/deliver")
     public Claim markDelivered(@PathVariable Long id) {

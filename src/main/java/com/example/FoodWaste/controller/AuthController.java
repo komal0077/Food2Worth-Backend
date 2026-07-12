@@ -1,6 +1,7 @@
 package com.example.FoodWaste.controller;
 
 import com.example.FoodWaste.dto.AuthRequest;
+import com.example.FoodWaste.dto.AuthResponse;
 import com.example.FoodWaste.entity.User;
 import com.example.FoodWaste.service.AuthService;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +23,7 @@ public class AuthController {
 
     // Login
     @PostMapping("/login")
-    public String login(@RequestBody AuthRequest request) {
+    public AuthResponse login(@RequestBody AuthRequest request) {
 
         return authService.login(request);
     }
