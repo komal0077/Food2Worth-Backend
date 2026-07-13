@@ -10,4 +10,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     List<Notification> findByUserId(Long userId);
 
     List<Notification> findByIsRead(Boolean isRead);
+
+    List<Notification> findByUserIdAndIsRead(Long userId, Boolean isRead);
 }

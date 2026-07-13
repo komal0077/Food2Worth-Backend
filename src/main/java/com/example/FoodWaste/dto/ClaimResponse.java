@@ -21,6 +21,10 @@ public class ClaimResponse {
     // Food Details
     private Long listingId;
 
+    private Long donorId;
+
+    private String donorName;
+
     private String title;
 
     private String description;

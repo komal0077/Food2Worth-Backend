@@ -1,9 +1,13 @@
 package com.example.FoodWaste.controller;
 
+import com.example.FoodWaste.dto.CreateListingRequest;
 import com.example.FoodWaste.entity.FoodListing;
+import com.example.FoodWaste.security.AuthenticatedUser;
 import com.example.FoodWaste.service.FoodListingService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,18 +19,24 @@ public class FoodListingController {
 
     private final FoodListingService foodListingService;
 
-    // Create Listing
+    // Create Listing - requires auth, donor identity taken from the logged-in user
     @PostMapping
-    public FoodListing createListing(@RequestBody FoodListing foodListing) {
+    public FoodListing createListing(
+            @Valid @RequestBody CreateListingRequest request,
+            @AuthenticationPrincipal AuthenticatedUser principal
+    ) {
 
-        return foodListingService.createListing(foodListing);
+        return foodListingService.createListing(request, principal);
     }
 
-    // Get All Listings
+    // Get All Listings (public, paginated)
     @GetMapping
-    public List<FoodListing> getAllListings() {
+    public List<FoodListing> getAllListings(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size
+    ) {
 
-        return foodListingService.getAllListings();
+        return foodListingService.getAllListings(page, size);
     }
 
     // Get Listing By Id
@@ -50,12 +60,14 @@ public class FoodListingController {
         return foodListingService.getListingsByDonor(donorId);
     }
 
-    // Delete Listing
+    // Delete Listing - only the owning donor or an admin
     @DeleteMapping("/{id}")
-    public ResponseEntity <String> deleteListing(
-            @PathVariable Long id) {
+    public ResponseEntity<String> deleteListing(
+            @PathVariable Long id,
+            @AuthenticationPrincipal AuthenticatedUser principal
+    ) {
 
-        foodListingService.deleteListing(id);
+        foodListingService.deleteListing(id, principal);
 
         return ResponseEntity.ok(
                 "Food Listing Deleted Successfully");

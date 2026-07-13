@@ -2,12 +2,17 @@ package com.example.FoodWaste.config;
 
 import com.example.FoodWaste.security.JwtFilter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -23,6 +28,14 @@ public class SecurityConfig {
 
     private final JwtFilter jwtFilter;
 
+    @Value("${app.cors.allowed-origins}")
+    private String allowedOrigins;
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http)
             throws Exception {
@@ -33,18 +46,23 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
 
-                        // Public APIs
-                        .requestMatchers(
-                                "/api/auth/**",
-                                "/api/listings/**",
-                                "/api/claims/**",
-                                "/api/reviews/**",
-                                "/api/notifications/**"
+                        // Fully public - registration/login
+                        .requestMatchers("/api/auth/**").permitAll()
 
-                        ).permitAll()
+                        // Public read access - browsing listings/reviews doesn't need an account
+                        .requestMatchers(HttpMethod.GET, "/api/listings/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/reviews/**").permitAll()
 
-                        // Everything else protected
+                        // Everything else (all writes/deletes, users, claims, notifications) needs a valid JWT
                         .anyRequest().authenticated()
+                )
+
+                .exceptionHandling(handling -> handling
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                            response.setStatus(401);
+                            response.getWriter().write("{\"message\":\"Authentication required\"}");
+                        })
                 )
 
                 .sessionManagement(session ->
@@ -68,7 +86,7 @@ public class SecurityConfig {
                 new CorsConfiguration();
 
         configuration.setAllowedOrigins(
-                List.of("http://localhost:4200")
+                List.of(allowedOrigins.split("\\s*,\\s*"))
         );
 
         configuration.setAllowedMethods(

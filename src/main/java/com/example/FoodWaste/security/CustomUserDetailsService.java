@@ -24,7 +24,9 @@ public class CustomUserDetailsService
                 .orElseThrow(() ->
                         new UsernameNotFoundException("User Not Found"));
 
-        return new org.springframework.security.core.userdetails.User(
+        return new AuthenticatedUser(
+                user.getId(),
+                user.getName(),
                 user.getEmail(),
                 user.getPassword(),
                 Collections.singleton(

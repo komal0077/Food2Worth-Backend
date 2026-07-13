@@ -1,41 +1,35 @@
 package com.example.FoodWaste.service;
 import com.example.FoodWaste.entity.User;
+import com.example.FoodWaste.exception.NotFoundException;
 import com.example.FoodWaste.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class UserService {
 
+    private static final int MAX_PAGE_SIZE = 200;
+
     private final UserRepository userRepository;
 
-    // Register User
-    public User registerUser(User user) {
-
-        user.setCreatedAt(LocalDateTime.now());
-
-        user.setIsApproved(true);
-
-        user.setIsVerified(true);
-
-        return userRepository.save(user);
-    }
-
     // Get All Users
-    public List<User> getAllUsers() {
+    public List<User> getAllUsers(Integer page, Integer size) {
 
-        return userRepository.findAll();
+        int pageNumber = page != null && page >= 0 ? page : 0;
+        int pageSize = size != null && size > 0 ? Math.min(size, MAX_PAGE_SIZE) : MAX_PAGE_SIZE;
+
+        return userRepository.findAll(PageRequest.of(pageNumber, pageSize)).getContent();
     }
 
     // Get User By Id
     public User getUserById(Long id) {
 
         return userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User Not Found"));
+                .orElseThrow(() -> new NotFoundException("User Not Found"));
     }
 
     // Get Users By Role
@@ -46,6 +40,10 @@ public class UserService {
 
     // Delete User
     public void deleteUser(Long id) {
+
+        if (!userRepository.existsById(id)) {
+            throw new NotFoundException("User Not Found");
+        }
 
         userRepository.deleteById(id);
     }
