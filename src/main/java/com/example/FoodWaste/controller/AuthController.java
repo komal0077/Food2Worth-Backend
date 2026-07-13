@@ -2,8 +2,10 @@ package com.example.FoodWaste.controller;
 
 import com.example.FoodWaste.dto.AuthRequest;
 import com.example.FoodWaste.dto.AuthResponse;
-import com.example.FoodWaste.entity.User;
+import com.example.FoodWaste.dto.RegisterRequest;
+import com.example.FoodWaste.dto.UserResponse;
 import com.example.FoodWaste.service.AuthService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,14 +18,14 @@ public class AuthController {
 
     // Register
     @PostMapping("/register")
-    public User register(@RequestBody User user) {
+    public UserResponse register(@Valid @RequestBody RegisterRequest request) {
 
-        return authService.register(user);
+        return authService.register(request);
     }
 
     // Login
     @PostMapping("/login")
-    public AuthResponse login(@RequestBody AuthRequest request) {
+    public AuthResponse login(@Valid @RequestBody AuthRequest request) {
 
         return authService.login(request);
     }

@@ -2,11 +2,16 @@ package com.example.FoodWaste.service;
 
 import com.example.FoodWaste.dto.AuthRequest;
 import com.example.FoodWaste.dto.AuthResponse;
+import com.example.FoodWaste.dto.RegisterRequest;
+import com.example.FoodWaste.dto.UserResponse;
 import com.example.FoodWaste.entity.User;
 import com.example.FoodWaste.repository.UserRepository;
 import com.example.FoodWaste.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -15,27 +20,37 @@ public class AuthService {
     private final UserRepository userRepository;
 
     private final JwtUtil jwtUtil;
+    private final PasswordEncoder passwordEncoder;
 
     // Register User
-    public User register(User user) {
+    public UserResponse register(RegisterRequest request) {
 
-        if (userRepository.findByEmail(user.getEmail()).isPresent()) {
+        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
             throw new IllegalArgumentException("Email is already registered");
         }
 
-        return userRepository.save(user);
+        User user = User.builder()
+                .name(request.getName())
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .phone(request.getPhone())
+                .role(request.getRole())
+                .isVerified(true)
+                .isApproved(true)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        return UserResponse.from(userRepository.save(user));
     }
 
     // Login User
     public AuthResponse login(AuthRequest request) {
 
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("User Not Found"));
+                .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
 
-        // Simple password check for now
-        if (!user.getPassword().equals(request.getPassword())) {
-
-            throw new RuntimeException("Invalid Password");
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new BadCredentialsException("Invalid email or password");
         }
 
         String token = jwtUtil.generateToken(user.getEmail());

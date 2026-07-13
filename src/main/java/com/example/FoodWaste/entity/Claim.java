@@ -23,14 +23,16 @@ public class Claim {
     // Food Listing
     private Long listingId;
 
-    // Volunteer
+    // Volunteers aren't required to hold an account, so pickup is tracked as free-text
+    // contact info entered by the claiming NGO rather than a User relation.
     private Long volunteerId;
 
     private String volunteerName;
 
     private String volunteerPhone;
 
-    // NGO
+    // NGO - snapshot of the claiming user's identity at claim time (not a live join to
+    // User), so a later name change doesn't rewrite history on past claims.
     private Long ngoId;
 
     private String ngoName;

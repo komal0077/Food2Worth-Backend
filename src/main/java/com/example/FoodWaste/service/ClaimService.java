@@ -1,22 +1,30 @@
 package com.example.FoodWaste.service;
 
 import com.example.FoodWaste.dto.ClaimResponse;
+import com.example.FoodWaste.dto.CreateClaimRequest;
 import com.example.FoodWaste.entity.Claim;
 import com.example.FoodWaste.entity.FoodListing;
 import com.example.FoodWaste.entity.Notification;
+import com.example.FoodWaste.exception.NotFoundException;
 import com.example.FoodWaste.repository.ClaimRepository;
 import com.example.FoodWaste.repository.FoodListingRepository;
+import com.example.FoodWaste.security.AuthenticatedUser;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class ClaimService {
 
+    private static final int MAX_PAGE_SIZE = 200;
 
     private final ClaimRepository claimRepository;
 
@@ -24,50 +32,59 @@ public class ClaimService {
 
     private final NotificationService notificationService;
 
-    // Create Claim
-    public Claim createClaim(Claim claim) {
+    // Create Claim - ngo identity always comes from the authenticated user, never the request body
+    public Claim createClaim(CreateClaimRequest request, AuthenticatedUser principal) {
 
-        claim.setCreatedAt(LocalDateTime.now());
+        FoodListing listing = foodListingRepository.findById(request.getListingId())
+                .orElseThrow(() -> new NotFoundException("Food Listing Not Found"));
 
-        claim.setStatus("CLAIMED");
+        if (!"ACTIVE".equals(listing.getStatus())) {
+            throw new IllegalArgumentException("This listing is no longer available to claim");
+        }
+
+        Claim claim = Claim.builder()
+                .listingId(listing.getId())
+                .ngoId(principal.getId())
+                .ngoName(principal.getFullName())
+                .volunteerName(request.getVolunteerName())
+                .volunteerPhone(request.getVolunteerPhone())
+                .status("CLAIMED")
+                .createdAt(LocalDateTime.now())
+                .build();
 
         Claim savedClaim = claimRepository.save(claim);
 
-        FoodListing listing = foodListingRepository.findById(claim.getListingId()).orElse(null);
+        listing.setStatus("CLAIMED");
+        foodListingRepository.save(listing);
 
-        if (listing != null) {
-
-            listing.setStatus("CLAIMED");
-
-            foodListingRepository.save(listing);
-
-            notificationService.createNotification(
-                    Notification.builder()
-                            .userId(listing.getDonorId())
-                            .userName(listing.getDonorName())
-                            .type("FOOD_CLAIMED")
-                            .message(
-                                    (claim.getNgoName() != null ? claim.getNgoName() : "An NGO")
-                                            + " claimed your food listing \"" + listing.getTitle() + "\""
-                            )
-                            .build()
-            );
-        }
+        notificationService.createNotification(
+                Notification.builder()
+                        .userId(listing.getDonorId())
+                        .userName(listing.getDonorName())
+                        .type("FOOD_CLAIMED")
+                        .message(
+                                principal.getFullName() + " claimed your food listing \"" + listing.getTitle() + "\""
+                        )
+                        .build()
+        );
 
         return savedClaim;
     }
 
-    // Get All Claims
-    public List<Claim> getAllClaims() {
+    // Get All Claims (admin only - paginated)
+    public List<Claim> getAllClaims(Integer page, Integer size) {
 
-        return claimRepository.findAll();
+        int pageNumber = page != null && page >= 0 ? page : 0;
+        int pageSize = size != null && size > 0 ? Math.min(size, MAX_PAGE_SIZE) : MAX_PAGE_SIZE;
+
+        return claimRepository.findAll(PageRequest.of(pageNumber, pageSize)).getContent();
     }
 
     // Get Claim By Id
     public Claim getClaimById(Long id) {
 
         return claimRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Claim Not Found"));
+                .orElseThrow(() -> new NotFoundException("Claim Not Found"));
     }
 
     // Get Claims By Volunteer
@@ -82,10 +99,12 @@ public class ClaimService {
         return claimRepository.findByNgoId(ngoId);
     }
 
-    // Mark Picked Up
-    public Claim markPickedUp(Long id) {
+    // Mark Picked Up - only the claiming NGO or an admin
+    public Claim markPickedUp(Long id, AuthenticatedUser principal) {
 
         Claim claim = getClaimById(id);
+
+        requireClaimOwner(claim, principal);
 
         claim.setStatus("PICKED_UP");
 
@@ -113,10 +132,12 @@ public class ClaimService {
         return savedClaim;
     }
 
-    // Mark Delivered
-    public Claim markDelivered(Long id) {
+    // Mark Delivered - only the claiming NGO or an admin
+    public Claim markDelivered(Long id, AuthenticatedUser principal) {
 
         Claim claim = getClaimById(id);
+
+        requireClaimOwner(claim, principal);
 
         claim.setStatus("DELIVERED");
 
@@ -161,27 +182,44 @@ public class ClaimService {
         return savedClaim;
     }
 
-    // Get Claim + Food Listing Details
-    // Get Claim + Food Listing Details
-    public List<ClaimResponse> getAllClaimDetails() {
+    // Get Claim + Food Listing Details (admin only - unscoped, paginated)
+    public List<ClaimResponse> getAllClaimDetails(Integer page, Integer size) {
 
-        List<Claim> claims = claimRepository.findAll();
+        int pageNumber = page != null && page >= 0 ? page : 0;
+        int pageSize = size != null && size > 0 ? Math.min(size, MAX_PAGE_SIZE) : MAX_PAGE_SIZE;
+
+        List<Claim> claims = claimRepository.findAll(PageRequest.of(pageNumber, pageSize)).getContent();
+
+        return toClaimResponses(claims);
+    }
+
+    // Get Claim + Food Listing Details scoped to the authenticated NGO's own claims
+    public List<ClaimResponse> getMyClaimDetails(AuthenticatedUser principal) {
+
+        List<Claim> claims = claimRepository.findByNgoId(principal.getId());
+
+        return toClaimResponses(claims);
+    }
+
+    // Batches the food listing lookups instead of one query per claim
+    private List<ClaimResponse> toClaimResponses(List<Claim> claims) {
+
+        List<Long> listingIds = claims.stream()
+                .map(Claim::getListingId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+
+        Map<Long, FoodListing> listingsById = foodListingRepository.findAllById(listingIds).stream()
+                .collect(Collectors.toMap(FoodListing::getId, Function.identity()));
 
         return claims.stream()
-
                 .map(claim -> {
 
-                    // Skip invalid claims
-                    if (claim.getListingId() == null) {
-                        return null;
-                    }
+                    FoodListing food = claim.getListingId() != null
+                            ? listingsById.get(claim.getListingId())
+                            : null;
 
-                    FoodListing food =
-                            foodListingRepository
-                                    .findById(claim.getListingId())
-                                    .orElse(null);
-
-                    // Skip if food listing deleted
                     if (food == null) {
                         return null;
                     }
@@ -196,6 +234,8 @@ public class ClaimService {
                             .volunteerPhone(claim.getVolunteerPhone())
 
                             .listingId(food.getId())
+                            .donorId(food.getDonorId())
+                            .donorName(food.getDonorName())
                             .title(food.getTitle())
                             .description(food.getDescription())
                             .photoUrl(food.getPhotoUrl())
@@ -207,16 +247,24 @@ public class ClaimService {
                             .build();
 
                 })
-
-                .filter(Objects::nonNull)
-
+                .filter(java.util.Objects::nonNull)
                 .toList();
     }
 
-    // Delete Claim
-    public void deleteClaim(Long id) {
+    // Delete Claim - only the claiming NGO or an admin
+    public void deleteClaim(Long id, AuthenticatedUser principal) {
+
+        Claim claim = getClaimById(id);
+
+        requireClaimOwner(claim, principal);
 
         claimRepository.deleteById(id);
     }
 
+    private void requireClaimOwner(Claim claim, AuthenticatedUser principal) {
+
+        if (!principal.isSelfOrAdmin(claim.getNgoId())) {
+            throw new AccessDeniedException("You can only manage claims you made");
+        }
+    }
 }
