@@ -1,6 +1,7 @@
 package com.example.FoodWaste.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,6 +22,7 @@ public class Claim {
     private Long id;
 
     // Food Listing
+    @NotNull(message = "listingId is required")
     private Long listingId;
 
     // Volunteer
@@ -35,11 +37,8 @@ public class Claim {
 
     private String ngoName;
 
-    // CLAIMED
-    // PICKED_UP
-    // DELIVERED
-    // CANCELLED
-    private String status;
+    @Enumerated(EnumType.STRING)
+    private ClaimStatus status;
 
     // Pickup Time
     private LocalDateTime pickedUpAt;

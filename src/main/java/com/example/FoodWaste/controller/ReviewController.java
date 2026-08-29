@@ -2,10 +2,13 @@ package com.example.FoodWaste.controller;
 
 import com.example.FoodWaste.entity.Review;
 import com.example.FoodWaste.service.ReviewService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/reviews")
@@ -14,18 +17,19 @@ public class ReviewController {
 
     private final ReviewService reviewService;
 
-    // Create Review
+    // Create Review — any authenticated user
     @PostMapping
-    public Review createReview(@RequestBody Review review) {
+    @PreAuthorize("isAuthenticated()")
+    public Review createReview(@Valid @RequestBody Review review) {
 
         return reviewService.createReview(review);
     }
 
     // Get All Reviews
     @GetMapping
-    public List<Review> getAllReviews() {
+    public Page<Review> getAllReviews(@PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
 
-        return reviewService.getAllReviews();
+        return reviewService.getAllReviews(pageable);
     }
 
     // Get Review By Id
@@ -37,22 +41,25 @@ public class ReviewController {
 
     // Get Reviews Received By User
     @GetMapping("/reviewee/{revieweeId}")
-    public List<Review> getReviewsByReviewee(
-            @PathVariable Long revieweeId) {
+    public Page<Review> getReviewsByReviewee(
+            @PathVariable Long revieweeId,
+            @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
 
-        return reviewService.getReviewsByReviewee(revieweeId);
+        return reviewService.getReviewsByReviewee(revieweeId, pageable);
     }
 
     // Get Reviews Given By User
     @GetMapping("/reviewer/{reviewerId}")
-    public List<Review> getReviewsByReviewer(
-            @PathVariable Long reviewerId) {
+    public Page<Review> getReviewsByReviewer(
+            @PathVariable Long reviewerId,
+            @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
 
-        return reviewService.getReviewsByReviewer(reviewerId);
+        return reviewService.getReviewsByReviewer(reviewerId, pageable);
     }
 
-    // Delete Review
+    // Delete Review — admin only
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public String deleteReview(@PathVariable Long id) {
 
         reviewService.deleteReview(id);

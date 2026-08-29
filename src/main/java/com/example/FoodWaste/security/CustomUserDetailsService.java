@@ -28,7 +28,7 @@ public class CustomUserDetailsService
                 user.getEmail(),
                 user.getPassword(),
                 Collections.singleton(
-                        new SimpleGrantedAuthority(user.getRole())
+                        new SimpleGrantedAuthority(user.getRole().name())
                 )
         );
     }

@@ -1,12 +1,14 @@
 package com.example.FoodWaste.service;
 
 import com.example.FoodWaste.entity.Notification;
+import com.example.FoodWaste.exception.ResourceNotFoundException;
 import com.example.FoodWaste.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -25,28 +27,28 @@ public class NotificationService {
     }
 
     // Get All Notifications
-    public List<Notification> getAllNotifications() {
+    public Page<Notification> getAllNotifications(Pageable pageable) {
 
-        return notificationRepository.findAll();
+        return notificationRepository.findAll(pageable);
     }
 
     // Get Notification By Id
     public Notification getNotificationById(Long id) {
 
         return notificationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Notification Not Found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Notification Not Found"));
     }
 
     // Get Notifications By User
-    public List<Notification> getNotificationsByUser(Long userId) {
+    public Page<Notification> getNotificationsByUser(Long userId, Pageable pageable) {
 
-        return notificationRepository.findByUserId(userId);
+        return notificationRepository.findByUserId(userId, pageable);
     }
 
     // Get Unread Notifications
-    public List<Notification> getUnreadNotifications() {
+    public Page<Notification> getUnreadNotifications(Pageable pageable) {
 
-        return notificationRepository.findByIsRead(false);
+        return notificationRepository.findByIsRead(false, pageable);
     }
 
     // Mark Notification As Read

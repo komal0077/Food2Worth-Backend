@@ -28,12 +28,8 @@ public class Notification {
     // Notification Message
     private String message;
 
-    // Types:
-    // FOOD_CLAIMED
-    // FOOD_DELIVERED
-    // NEW_LISTING
-    // FOOD_EXPIRED
-    private String type;
+    @Enumerated(EnumType.STRING)
+    private NotificationType type;
 
     // Read Status
     private Boolean isRead;

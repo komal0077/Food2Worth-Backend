@@ -1,11 +1,13 @@
 package com.example.FoodWaste.service;
+import com.example.FoodWaste.dto.UserResponse;
+import com.example.FoodWaste.entity.Role;
 import com.example.FoodWaste.entity.User;
+import com.example.FoodWaste.exception.ResourceNotFoundException;
 import com.example.FoodWaste.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -13,35 +15,27 @@ public class UserService {
 
     private final UserRepository userRepository;
 
-    // Register User
-    public User registerUser(User user) {
-
-        user.setCreatedAt(LocalDateTime.now());
-
-        user.setIsApproved(true);
-
-        user.setIsVerified(true);
-
-        return userRepository.save(user);
-    }
-
     // Get All Users
-    public List<User> getAllUsers() {
+    public Page<UserResponse> getAllUsers(Pageable pageable) {
 
-        return userRepository.findAll();
+        return userRepository.findAll(pageable)
+                .map(AuthService::toResponse);
     }
 
     // Get User By Id
-    public User getUserById(Long id) {
+    public UserResponse getUserById(Long id) {
 
-        return userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User Not Found"));
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User Not Found"));
+
+        return AuthService.toResponse(user);
     }
 
     // Get Users By Role
-    public List<User> getUsersByRole(String role) {
+    public Page<UserResponse> getUsersByRole(Role role, Pageable pageable) {
 
-        return userRepository.findByRole(role);
+        return userRepository.findByRole(role, pageable)
+                .map(AuthService::toResponse);
     }
 
     // Delete User

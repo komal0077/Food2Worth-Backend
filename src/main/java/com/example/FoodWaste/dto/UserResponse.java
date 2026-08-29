@@ -1,5 +1,5 @@
-package com.example.FoodWaste.entity;
-import jakarta.persistence.*;
+package com.example.FoodWaste.dto;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -7,46 +7,34 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "users")
+// Safe, outward-facing view of a User — never exposes the password
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class User {
+public class UserResponse {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Basic Details
     private String name;
 
-    @Column(unique = true)
     private String email;
-
-    private String password;
 
     private String phone;
 
-    @Enumerated(EnumType.STRING)
-    private Role role;
+    private String role;
 
-    // Address Details
     private String address;
 
     private Double latitude;
 
     private Double longitude;
 
-    // Profile Details
     private String profilePhoto;
 
-    // Verification
     private Boolean isVerified;
 
     private Boolean isApproved;
 
-    // Audit
     private LocalDateTime createdAt;
 }

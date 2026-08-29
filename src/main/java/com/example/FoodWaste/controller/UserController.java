@@ -1,10 +1,13 @@
 package com.example.FoodWaste.controller;
-import com.example.FoodWaste.entity.User;
+import com.example.FoodWaste.dto.UserResponse;
+import com.example.FoodWaste.entity.Role;
 import com.example.FoodWaste.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
@@ -13,36 +16,35 @@ public class UserController {
 
     private final UserService userService;
 
-    // Register User
-    @PostMapping("/register")
-    public User registerUser(@RequestBody User user) {
-
-        return userService.registerUser(user);
-    }
-
-    // Get All Users
+    // Get All Users — admin only
     @GetMapping
-    public List<User> getAllUsers() {
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public Page<UserResponse> getAllUsers(@PageableDefault(size = 20) Pageable pageable) {
 
-        return userService.getAllUsers();
+        return userService.getAllUsers(pageable);
     }
 
-    // Get User By Id
+    // Get User By Id — admin only; users fetch their own profile via /api/auth
     @GetMapping("/{id}")
-    public User getUserById(@PathVariable Long id) {
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public UserResponse getUserById(@PathVariable Long id) {
 
         return userService.getUserById(id);
     }
 
-    // Get Users By Role
+    // Get Users By Role — admin only
     @GetMapping("/role/{role}")
-    public List<User> getUsersByRole(@PathVariable String role) {
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public Page<UserResponse> getUsersByRole(
+            @PathVariable Role role,
+            @PageableDefault(size = 20) Pageable pageable) {
 
-        return userService.getUsersByRole(role);
+        return userService.getUsersByRole(role, pageable);
     }
 
-    // Delete User
+    // Delete User — admin only
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public String deleteUser(@PathVariable Long id) {
 
         userService.deleteUser(id);

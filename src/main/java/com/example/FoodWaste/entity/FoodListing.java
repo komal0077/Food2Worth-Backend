@@ -1,6 +1,9 @@
 package com.example.FoodWaste.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Future;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,12 +24,14 @@ public class FoodListing {
     private Long id;
 
     // Food Details
+    @NotBlank(message = "Title is required")
     private String title;
 
     private String description;
 
     private String category;
 
+    @Positive(message = "Quantity must be greater than zero")
     private Integer quantity;
 
     private String quantityUnit;
@@ -54,15 +59,16 @@ public class FoodListing {
     private LocalDateTime pickupEndTime;
 
     // Food Expiry Time
+    @Future(message = "Expiry time must be in the future")
     private LocalDateTime expiryTime;
 
-    // ACTIVE
-    // CLAIMED
-    // COMPLETED
-    // EXPIRED
-    // CANCELLED
-    private String status;
+    @Enumerated(EnumType.STRING)
+    private ListingStatus status;
 
     // Audit
     private LocalDateTime createdAt;
+
+    // Optimistic locking — prevents two concurrent claims on the same listing
+    @Version
+    private Long version;
 }

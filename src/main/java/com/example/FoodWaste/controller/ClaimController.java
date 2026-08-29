@@ -3,10 +3,13 @@ package com.example.FoodWaste.controller;
 import com.example.FoodWaste.dto.ClaimResponse;
 import com.example.FoodWaste.entity.Claim;
 import com.example.FoodWaste.service.ClaimService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/claims")
@@ -15,18 +18,19 @@ public class ClaimController {
 
     private final ClaimService claimService;
 
-    // Create Claim
+    // Create Claim — only NGOs/volunteers can claim a listing
     @PostMapping
-    public Claim createClaim(@RequestBody Claim claim) {
+    @PreAuthorize("hasAnyAuthority('NGO', 'VOLUNTEER', 'ADMIN')")
+    public Claim createClaim(@Valid @RequestBody Claim claim) {
 
         return claimService.createClaim(claim);
     }
 
     // Get All Claims
     @GetMapping
-    public List<Claim> getAllClaims() {
+    public Page<Claim> getAllClaims(@PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
 
-        return claimService.getAllClaims();
+        return claimService.getAllClaims(pageable);
     }
 
     // Get Claim By Id
@@ -38,39 +42,47 @@ public class ClaimController {
 
     // Get Claims By Volunteer
     @GetMapping("/volunteer/{volunteerId}")
-    public List<Claim> getClaimsByVolunteer(@PathVariable Long volunteerId) {
+    public Page<Claim> getClaimsByVolunteer(
+            @PathVariable Long volunteerId,
+            @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
 
-        return claimService.getClaimsByVolunteer(volunteerId);
+        return claimService.getClaimsByVolunteer(volunteerId, pageable);
     }
 
     // Get Claims By NGO
     @GetMapping("/ngo/{ngoId}")
-    public List<Claim> getClaimsByNgo(@PathVariable Long ngoId) {
+    public Page<Claim> getClaimsByNgo(
+            @PathVariable Long ngoId,
+            @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
 
-        return claimService.getClaimsByNgo(ngoId);
+        return claimService.getClaimsByNgo(ngoId, pageable);
     }
 
-    // Mark Picked Up
+    // Mark Picked Up — the assigned volunteer/admin
     @PutMapping("/{id}/pickup")
+    @PreAuthorize("hasAnyAuthority('VOLUNTEER', 'ADMIN')")
     public Claim markPickedUp(@PathVariable Long id) {
 
         return claimService.markPickedUp(id);
     }
+
     @GetMapping("/details")
-    public List<ClaimResponse> getAllClaimDetails() {
+    public Page<ClaimResponse> getAllClaimDetails(
+            @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
 
-        return claimService.getAllClaimDetails();
-
+        return claimService.getAllClaimDetails(pageable);
     }
-    // Mark Delivered
+    // Mark Delivered — the receiving NGO/volunteer/admin
     @PutMapping("/{id}/deliver")
+    @PreAuthorize("hasAnyAuthority('NGO', 'VOLUNTEER', 'ADMIN')")
     public Claim markDelivered(@PathVariable Long id) {
 
         return claimService.markDelivered(id);
     }
 
-    // Delete Claim
+    // Delete Claim — admin only
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public String deleteClaim(@PathVariable Long id) {
 
         claimService.deleteClaim(id);

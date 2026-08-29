@@ -1,15 +1,16 @@
 package com.example.FoodWaste.repository;
 
 import com.example.FoodWaste.entity.Claim;
+import com.example.FoodWaste.entity.ClaimStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-
-import java.util.List;
 
 public interface ClaimRepository extends JpaRepository<Claim, Long> {
 
-    List<Claim> findByVolunteerId(Long volunteerId);
+    Page<Claim> findByVolunteerId(Long volunteerId, Pageable pageable);
 
-    List<Claim> findByNgoId(Long ngoId);
+    Page<Claim> findByNgoId(Long ngoId, Pageable pageable);
 
-    List<Claim> findByStatus(String status);
+    Page<Claim> findByStatus(ClaimStatus status, Pageable pageable);
 }

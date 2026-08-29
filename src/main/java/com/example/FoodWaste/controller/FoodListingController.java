@@ -1,12 +1,16 @@
 package com.example.FoodWaste.controller;
 
 import com.example.FoodWaste.entity.FoodListing;
+import com.example.FoodWaste.entity.ListingStatus;
 import com.example.FoodWaste.service.FoodListingService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/listings")
@@ -15,18 +19,20 @@ public class FoodListingController {
 
     private final FoodListingService foodListingService;
 
-    // Create Listing
+    // Create Listing — only donors/admins may publish a listing
     @PostMapping
-    public FoodListing createListing(@RequestBody FoodListing foodListing) {
+    @PreAuthorize("hasAnyAuthority('DONOR', 'ADMIN')")
+    public FoodListing createListing(@Valid @RequestBody FoodListing foodListing) {
 
         return foodListingService.createListing(foodListing);
     }
 
     // Get All Listings
     @GetMapping
-    public List<FoodListing> getAllListings() {
+    public Page<FoodListing> getAllListings(
+            @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
 
-        return foodListingService.getAllListings();
+        return foodListingService.getAllListings(pageable);
     }
 
     // Get Listing By Id
@@ -38,20 +44,25 @@ public class FoodListingController {
 
     // Get Listings By Status
     @GetMapping("/status/{status}")
-    public List<FoodListing> getListingsByStatus(@PathVariable String status) {
+    public Page<FoodListing> getListingsByStatus(
+            @PathVariable ListingStatus status,
+            @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
 
-        return foodListingService.getListingsByStatus(status);
+        return foodListingService.getListingsByStatus(status, pageable);
     }
 
     // Get Listings By Donor
     @GetMapping("/donor/{donorId}")
-    public List<FoodListing> getListingsByDonor(@PathVariable Long donorId) {
+    public Page<FoodListing> getListingsByDonor(
+            @PathVariable Long donorId,
+            @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
 
-        return foodListingService.getListingsByDonor(donorId);
+        return foodListingService.getListingsByDonor(donorId, pageable);
     }
 
-    // Delete Listing
+    // Delete Listing — ownership is enforced in the service layer
     @DeleteMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity <String> deleteListing(
             @PathVariable Long id) {
 
