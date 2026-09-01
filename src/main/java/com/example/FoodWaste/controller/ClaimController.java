@@ -66,7 +66,9 @@ public class ClaimController {
         return claimService.markPickedUp(id);
     }
 
+    // My Claims — scoped to the calling NGO/volunteer's own claims
     @GetMapping("/details")
+    @PreAuthorize("hasAnyAuthority('NGO', 'VOLUNTEER')")
     public Page<ClaimResponse> getAllClaimDetails(
             @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
 

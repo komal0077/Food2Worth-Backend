@@ -1,5 +1,6 @@
 package com.example.FoodWaste.service;
 import com.example.FoodWaste.dto.UserResponse;
+import com.example.FoodWaste.dto.VolunteerSummary;
 import com.example.FoodWaste.entity.Role;
 import com.example.FoodWaste.entity.User;
 import com.example.FoodWaste.exception.ResourceNotFoundException;
@@ -14,6 +15,17 @@ import org.springframework.stereotype.Service;
 public class UserService {
 
     private final UserRepository userRepository;
+
+    // Get Volunteers — for an NGO to pick from when assigning a claim
+    public Page<VolunteerSummary> getVolunteers(Pageable pageable) {
+
+        return userRepository.findByRole(Role.VOLUNTEER, pageable)
+                .map(user -> VolunteerSummary.builder()
+                        .id(user.getId())
+                        .name(user.getName())
+                        .phone(user.getPhone())
+                        .build());
+    }
 
     // Get All Users
     public Page<UserResponse> getAllUsers(Pageable pageable) {

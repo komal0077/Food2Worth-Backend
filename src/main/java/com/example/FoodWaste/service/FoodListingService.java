@@ -26,11 +26,19 @@ public class FoodListingService {
 
     private final UserRepository userRepository;
 
-    // Create Food Listing
+    // Create Food Listing — donor identity always comes from the authenticated
+    // user, never from the request body, so a caller can't list food under
+    // someone else's name/id.
     public FoodListing createListing(FoodListing foodListing) {
 
-        foodListing.setCreatedAt(LocalDateTime.now());
+        User currentUser = userRepository.findByEmail(SecurityUtils.getCurrentUserEmail())
+                .orElseThrow(() -> new ResourceNotFoundException("User Not Found"));
 
+        foodListing.setId(null);
+        foodListing.setDonorId(currentUser.getId());
+        foodListing.setDonorName(currentUser.getName());
+        foodListing.setDonorPhone(currentUser.getPhone());
+        foodListing.setCreatedAt(LocalDateTime.now());
         foodListing.setStatus(ListingStatus.ACTIVE);
 
         FoodListing saved = foodListingRepository.save(foodListing);

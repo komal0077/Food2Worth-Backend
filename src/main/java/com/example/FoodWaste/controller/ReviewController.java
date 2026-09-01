@@ -1,5 +1,7 @@
 package com.example.FoodWaste.controller;
 
+import com.example.FoodWaste.dto.CreateReviewRequest;
+import com.example.FoodWaste.dto.ReviewResponse;
 import com.example.FoodWaste.entity.Review;
 import com.example.FoodWaste.service.ReviewService;
 import jakarta.validation.Valid;
@@ -17,12 +19,13 @@ public class ReviewController {
 
     private final ReviewService reviewService;
 
-    // Create Review — any authenticated user
+    // Create Review — the caller only submits claimId, rating and comment;
+    // reviewer/reviewee identity is derived server-side from the claim
     @PostMapping
     @PreAuthorize("isAuthenticated()")
-    public Review createReview(@Valid @RequestBody Review review) {
+    public ReviewResponse createReview(@Valid @RequestBody CreateReviewRequest request) {
 
-        return reviewService.createReview(review);
+        return reviewService.createReview(request);
     }
 
     // Get All Reviews

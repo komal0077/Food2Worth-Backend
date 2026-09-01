@@ -11,11 +11,17 @@ public class FoodWasteApplication {
 		// Spring Boot 4.1.0-RC1 does not ship a Flyway autoconfiguration module yet,
 		// so migrations are run explicitly here before the context (and Hibernate's
 		// schema validation) starts up.
+		String dbPassword = System.getenv("DB_PASSWORD");
+
+		if (dbPassword == null || dbPassword.isBlank()) {
+			throw new IllegalStateException("DB_PASSWORD environment variable must be set");
+		}
+
 		Flyway.configure()
 				.dataSource(
 						resolve("DB_URL", "jdbc:mysql://localhost:3306/FoodWaste"),
 						resolve("DB_USERNAME", "root"),
-						resolve("DB_PASSWORD", "Komal2001"))
+						dbPassword)
 				.baselineOnMigrate(Boolean.parseBoolean(resolve("FLYWAY_BASELINE_ON_MIGRATE", "false")))
 				.baselineVersion("0")
 				.load()

@@ -1,5 +1,6 @@
 package com.example.FoodWaste.controller;
 import com.example.FoodWaste.dto.UserResponse;
+import com.example.FoodWaste.dto.VolunteerSummary;
 import com.example.FoodWaste.entity.Role;
 import com.example.FoodWaste.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,15 @@ public class UserController {
     public Page<UserResponse> getAllUsers(@PageableDefault(size = 20) Pageable pageable) {
 
         return userService.getAllUsers(pageable);
+    }
+
+    // Get Volunteers — for an NGO to pick a real volunteer account when
+    // assigning a claim (id/name/phone only, not the full admin user view)
+    @GetMapping("/volunteers")
+    @PreAuthorize("hasAnyAuthority('NGO', 'ADMIN')")
+    public Page<VolunteerSummary> getVolunteers(@PageableDefault(size = 50) Pageable pageable) {
+
+        return userService.getVolunteers(pageable);
     }
 
     // Get User By Id — admin only; users fetch their own profile via /api/auth

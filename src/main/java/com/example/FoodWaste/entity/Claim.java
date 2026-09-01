@@ -48,4 +48,9 @@ public class Claim {
 
     // Audit
     private LocalDateTime createdAt;
+
+    // Optimistic locking — prevents lost updates when pickup/delivery status
+    // transitions race each other
+    @Version
+    private Long version;
 }

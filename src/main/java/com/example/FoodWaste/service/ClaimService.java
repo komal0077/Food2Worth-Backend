@@ -7,14 +7,19 @@ import com.example.FoodWaste.entity.FoodListing;
 import com.example.FoodWaste.entity.ListingStatus;
 import com.example.FoodWaste.entity.Notification;
 import com.example.FoodWaste.entity.NotificationType;
+import com.example.FoodWaste.entity.Role;
+import com.example.FoodWaste.entity.User;
 import com.example.FoodWaste.exception.ResourceNotFoundException;
 import com.example.FoodWaste.repository.ClaimRepository;
 import com.example.FoodWaste.repository.FoodListingRepository;
+import com.example.FoodWaste.repository.UserRepository;
+import com.example.FoodWaste.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,12 +39,17 @@ public class ClaimService {
 
     private final FoodListingRepository foodListingRepository;
 
+    private final UserRepository userRepository;
+
     private final NotificationService notificationService;
 
     // Create Claim — atomic with the listing status flip, and guarded
     // against two callers claiming the same listing at the same time.
     @Transactional
     public Claim createClaim(Claim claim) {
+
+        User currentUser = userRepository.findByEmail(SecurityUtils.getCurrentUserEmail())
+                .orElseThrow(() -> new ResourceNotFoundException("User Not Found"));
 
         FoodListing listing = foodListingRepository.findById(claim.getListingId())
                 .orElseThrow(() -> new ResourceNotFoundException("Food Listing Not Found"));
@@ -48,9 +58,39 @@ public class ClaimService {
             throw new IllegalStateException("This listing is no longer available to claim");
         }
 
+        claim.setId(null);
         claim.setCreatedAt(LocalDateTime.now());
 
         claim.setStatus(ClaimStatus.CLAIMED);
+
+        // Derive the claiming NGO/volunteer's own identity from the
+        // authenticated user — never trust a client-supplied ngoId, which
+        // would otherwise let one NGO claim on another's behalf.
+        if (currentUser.getRole() == Role.NGO) {
+            claim.setNgoId(currentUser.getId());
+            claim.setNgoName(currentUser.getName());
+        } else if (currentUser.getRole() == Role.VOLUNTEER) {
+            claim.setVolunteerId(currentUser.getId());
+            claim.setVolunteerName(currentUser.getName());
+            claim.setVolunteerPhone(currentUser.getPhone());
+        }
+
+        // An NGO may assign a real registered volunteer to the claim by id
+        // (e.g. from a dropdown) — unlike ngoId above, volunteerId here is a
+        // legitimate NGO choice, not an identity assertion about the caller,
+        // so it's trusted once resolved against a real VOLUNTEER account.
+        // The resulting name/phone always come from that account's own
+        // record, never from client-supplied text.
+        if (currentUser.getRole() == Role.NGO && claim.getVolunteerId() != null) {
+
+            User volunteer = userRepository.findById(claim.getVolunteerId())
+                    .filter(user -> user.getRole() == Role.VOLUNTEER)
+                    .orElseThrow(() -> new IllegalArgumentException("Selected volunteer not found"));
+
+            claim.setVolunteerId(volunteer.getId());
+            claim.setVolunteerName(volunteer.getName());
+            claim.setVolunteerPhone(volunteer.getPhone());
+        }
 
         Claim savedClaim;
 
@@ -90,8 +130,18 @@ public class ClaimService {
         return claimRepository.findAll(pageable);
     }
 
-    // Get Claim By Id
+    // Get Claim By Id — only the participating donor/volunteer/ngo or an
+    // admin may view a claim's details (it carries participant phone numbers)
     public Claim getClaimById(Long id) {
+
+        Claim claim = findClaimOrThrow(id);
+
+        requireParticipantOrAdmin(claim);
+
+        return claim;
+    }
+
+    private Claim findClaimOrThrow(Long id) {
 
         return claimRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Claim Not Found"));
@@ -109,11 +159,12 @@ public class ClaimService {
         return claimRepository.findByNgoId(ngoId, pageable);
     }
 
-    // Mark Picked Up
+    // Mark Picked Up — role-gated at the controller (VOLUNTEER/ADMIN), so no
+    // additional participant check is needed here on top of that
     @Transactional
     public Claim markPickedUp(Long id) {
 
-        Claim claim = getClaimById(id);
+        Claim claim = findClaimOrThrow(id);
 
         if (claim.getStatus() != ClaimStatus.CLAIMED) {
             throw new IllegalStateException("Claim must be CLAIMED before it can be picked up");
@@ -123,7 +174,16 @@ public class ClaimService {
 
         claim.setPickedUpAt(LocalDateTime.now());
 
-        Claim savedClaim = claimRepository.save(claim);
+        Claim savedClaim;
+
+        try {
+            // @Version on Claim makes this throw if another transaction
+            // already changed this claim's status concurrently.
+            savedClaim = claimRepository.saveAndFlush(claim);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            log.warn("Concurrent status-change conflict on claimId={}", id);
+            throw new IllegalStateException("This claim was just updated by someone else");
+        }
 
         FoodListing listing = foodListingRepository.findById(claim.getListingId())
                 .orElseThrow(() -> new ResourceNotFoundException("Food Listing Not Found"));
@@ -145,11 +205,12 @@ public class ClaimService {
         return savedClaim;
     }
 
-    // Mark Delivered
+    // Mark Delivered — role-gated at the controller (NGO/VOLUNTEER/ADMIN), so
+    // no additional participant check is needed here on top of that
     @Transactional
     public Claim markDelivered(Long id) {
 
-        Claim claim = getClaimById(id);
+        Claim claim = findClaimOrThrow(id);
 
         if (claim.getStatus() != ClaimStatus.PICKED_UP) {
             throw new IllegalStateException("Claim must be PICKED_UP before it can be delivered");
@@ -159,7 +220,16 @@ public class ClaimService {
 
         claim.setDeliveredAt(LocalDateTime.now());
 
-        Claim savedClaim = claimRepository.save(claim);
+        Claim savedClaim;
+
+        try {
+            // @Version on Claim makes this throw if another transaction
+            // already changed this claim's status concurrently.
+            savedClaim = claimRepository.saveAndFlush(claim);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            log.warn("Concurrent status-change conflict on claimId={}", id);
+            throw new IllegalStateException("This claim was just updated by someone else");
+        }
 
         FoodListing listing = foodListingRepository.findById(claim.getListingId())
                 .orElseThrow(() -> new ResourceNotFoundException("Food Listing Not Found"));
@@ -198,10 +268,16 @@ public class ClaimService {
         return savedClaim;
     }
 
-    // Get Claim + Food Listing Details
+    // Get Claim + Food Listing Details — scoped to the calling user's own
+    // claims (as an NGO or volunteer), so "my claims" only shows their claims
     public Page<ClaimResponse> getAllClaimDetails(Pageable pageable) {
 
-        Page<Claim> claims = claimRepository.findAll(pageable);
+        User currentUser = userRepository.findByEmail(SecurityUtils.getCurrentUserEmail())
+                .orElseThrow(() -> new ResourceNotFoundException("User Not Found"));
+
+        Page<Claim> claims = currentUser.getRole() == Role.VOLUNTEER
+                ? claimRepository.findByVolunteerId(currentUser.getId(), pageable)
+                : claimRepository.findByNgoId(currentUser.getId(), pageable);
 
         List<Long> listingIds = claims.stream()
                 .map(Claim::getListingId)
@@ -256,6 +332,28 @@ public class ClaimService {
         log.info("Deleting claim: claimId={}", id);
 
         claimRepository.deleteById(id);
+    }
+
+    private void requireParticipantOrAdmin(Claim claim) {
+
+        User currentUser = userRepository.findByEmail(SecurityUtils.getCurrentUserEmail())
+                .orElseThrow(() -> new ResourceNotFoundException("User Not Found"));
+
+        if (currentUser.getRole() == Role.ADMIN) {
+            return;
+        }
+
+        boolean isParticipant = currentUser.getId().equals(claim.getVolunteerId())
+                || currentUser.getId().equals(claim.getNgoId());
+
+        boolean isDonor = !isParticipant
+                && foodListingRepository.findById(claim.getListingId())
+                        .map(listing -> currentUser.getId().equals(listing.getDonorId()))
+                        .orElse(false);
+
+        if (!isParticipant && !isDonor) {
+            throw new AccessDeniedException("You do not have permission to view this claim");
+        }
     }
 
 }
